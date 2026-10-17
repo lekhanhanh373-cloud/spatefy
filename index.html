@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>spatefy — tạo file.js</title>
+  <style>
+    :root{
+      --bg:#0f1724;
+      --card:#0b1220;
+      --accent:#6ee7b7;
+      --muted:#9ca3af;
+      --glass: rgba(255,255,255,0.03);
+      --radius:12px;
+    }
+    *{box-sizing:border-box;font-family:Inter,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;}
+    body{
+      margin:0;
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background:linear-gradient(180deg,#071024 0%, #001021 100%);
+      color:#e6eef8;
+      padding:20px;
+    }
+    .container{
+      width:100%;
+      max-width:820px;
+      background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border-radius:var(--radius);
+      padding:20px;
+      box-shadow:0 6px 30px rgba(2,6,23,0.6);
+      backdrop-filter: blur(6px);
+    }
+    header{
+      text-align:center;
+      margin-bottom:16px;
+    }
+    h1{
+      margin:0;
+      font-size:28px;
+      letter-spacing:1px;
+      color:var(--accent);
+    }
+    p.lead{
+      margin:6px 0 0 0;
+      color:var(--muted);
+      font-size:13px;
+    }
+    label{display:block;margin-top:12px;font-size:13px;color:var(--muted)}
+    textarea{
+      width:100%;
+      min-height:220px;
+      resize:vertical;
+      padding:12px;
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,0.04);
+      background:var(--card);
+      color:#e6eef8;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", "Courier New", monospace;
+      font-size:14px;
+      outline:none;
+    }
+    input[type="text"]{
+      width:100%;
+      padding:10px 12px;
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,0.04);
+      background:var(--card);
+      color:#e6eef8;
+      font-size:14px;
+      margin-top:6px;
+      outline:none;
+    }
+    .actions{
+      display:flex;
+      gap:10px;
+      margin-top:12px;
+      flex-wrap:wrap;
+    }
+    button{
+      background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+      border:1px solid rgba(255,255,255,0.06);
+      color:var(--accent);
+      padding:10px 14px;
+      border-radius:10px;
+      cursor:pointer;
+      font-weight:600;
+      font-size:14px;
+    }
+    button.primary{
+      background:var(--accent);
+      color:#052018;
+      border:none;
+    }
+    button:disabled{
+      opacity:0.45;
+      cursor:not-allowed;
+    }
+    .status{
+      margin-top:10px;
+      color:var(--muted);
+      font-size:13px;
+    }
+    .result-row{
+      margin-top:14px;
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+    .chip{
+      background:var(--glass);
+      padding:8px 12px;
+      border-radius:999px;
+      color:var(--muted);
+      font-size:13px;
+      border:1px solid rgba(255,255,255,0.02);
+    }
+    @media (max-width:520px){
+      textarea{min-height:180px;}
+      h1{font-size:22px}
+    }
+  </style>
+</head>
+<body>
+  <div class="container" role="main">
+    <header>
+      <h1>spatefy</h1>
+      <p class="lead">Dán hoặc viết code vào ô dưới, sau đó tạo file .js</p>
+    </header>
+
+    <label for="codeInput">Code</label>
+    <textarea id="codeInput" placeholder="viết code..."></textarea>
+
+    <!-- name input xuất hiện khi có nội dung ở textarea -->
+    <div id="nameWrap" style="display:none;">
+      <label for="nameInput">Tên file (tuỳ chọn)</label>
+      <input id="nameInput" type="text" placeholder="tên..." />
+    </div>
+
+    <div class="actions">
+      <button id="createBtn" class="primary" disabled>Tạo</button>
+      <!-- Sau khi tạo, sẽ hiện các nút này -->
+      <button id="rawBtn" style="display:none;">Raw</button>
+      <button id="copyBtn" style="display:none;">Copy</button>
+      <button id="downloadBtn" style="display:none;">Tải</button>
+    </div>
+
+    <div class="status" id="status">Chưa có file nào được tạo.</div>
+
+    <div class="result-row" id="resultRow" style="display:none;">
+      <div class="chip" id="fileNameChip">file.js</div>
+      <div style="color:var(--muted);font-size:13px" id="fileSizeChip"></div>
+    </div>
+  </div>
+
+  <script>
+    const codeInput = document.getElementById('codeInput');
+    const nameWrap = document.getElementById('nameWrap');
+    const nameInput = document.getElementById('nameInput');
+    const createBtn = document.getElementById('createBtn');
+    const rawBtn = document.getElementById('rawBtn');
+    const copyBtn = document.getElementById('copyBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const status = document.getElementById('status');
+    const resultRow = document.getElementById('resultRow');
+    const fileNameChip = document.getElementById('fileNameChip');
+    const fileSizeChip = document.getElementById('fileSizeChip');
+
+    let currentBlobURL = null;
+    let currentFilename = 'file.js';
+    let currentCode = '';
+
+    // Hiển thị name input và bật nút Tạo khi có code
+    codeInput.addEventListener('input', () => {
+      const has = codeInput.value.trim().length > 0;
+      if (has) {
+        nameWrap.style.display = 'block';
+        createBtn.disabled = false;
+        status.textContent = 'Sẵn sàng để tạo file';
+      } else {
+        nameWrap.style.display = 'none';
+        createBtn.disabled = true;
+        status.textContent = 'Chưa có file nào được tạo.';
+        hideResultButtons();
+      }
+    });
+
+    // Tạo blob và hiển thị các nút
+    createBtn.addEventListener('click', () => {
+      const code = codeInput.value;
+      if (!code || code.trim().length === 0) {
+        alert('Vui lòng nhập code trước khi tạo file.');
+        return;
+      }
+
+      // filename mặc định file.js nếu không nhập
+      const nameVal = (nameInput.value || '').trim();
+      const filename = nameVal === '' ? 'file.js' : sanitizeFilename(nameVal);
+
+      // revoke url cũ
+      if (currentBlobURL) {
+        URL.revokeObjectURL(currentBlobURL);
+        currentBlobURL = null;
+      }
+
+      // tạo blob (set type text/javascript để raw hiển thị đúng)
+      const blob = new Blob([code], { type: 'text/javascript;charset=utf-8' });
+      currentBlobURL = URL.createObjectURL(blob);
+      currentFilename = filename;
+      currentCode = code;
+
+      // cập nhật UI
+      fileNameChip.textContent = filename;
+      fileSizeChip.textContent = `${blob.size} bytes`;
+      status.textContent = `Đã tạo ${filename}`;
+      resultRow.style.display = 'flex';
+      rawBtn.style.display = 'inline-block';
+      copyBtn.style.display = 'inline-block';
+      downloadBtn.style.display = 'inline-block';
+    });
+
+    rawBtn.addEventListener('click', () => {
+      if (!currentBlobURL) return;
+      // Mở raw trong tab mới
+      window.open(currentBlobURL, '_blank', 'noopener');
+    });
+
+    copyBtn.addEventListener('click', async () => {
+      if (!currentCode) return;
+      try {
+        await navigator.clipboard.writeText(currentCode);
+        status.textContent = 'Đã sao chép code vào clipboard.';
+      } catch (err) {
+        // fallback
+        copyFallback(currentCode);
+      }
+    });
+
+    downloadBtn.addEventListener('click', () => {
+      if (!currentBlobURL) return;
+      const a = document.createElement('a');
+      a.href = currentBlobURL;
+      a.download = currentFilename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      status.textContent = `Đã tải xuống ${currentFilename}`;
+    });
+
+    function hideResultButtons(){
+      rawBtn.style.display = 'none';
+      copyBtn.style.display = 'none';
+      downloadBtn.style.display = 'none';
+      resultRow.style.display = 'none';
+    }
+
+    function sanitizeFilename(name){
+      // thêm đuôi .js nếu user không nhập
+      let s = name;
+      // loại bỏ ký tự bất hợp pháp cơ bản
+      s = s.replace(/[\0\/\\:\*\?"<>\|]+/g,'').trim();
+      if (s.length === 0) s = 'file.js';
+      if (!s.toLowerCase().endsWith('.js')) s += '.js';
+      return s;
+    }
+
+    function copyFallback(text){
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        status.textContent = 'Đã sao chép code (fallback).';
+      } catch (e) {
+        alert('Không thể sao chép vào clipboard trên trình duyệt này.');
+      }
+      ta.remove();
+    }
+
+    // Khi unload, revoke blob url để tránh rò rỉ bộ nhớ
+    window.addEventListener('beforeunload', () => {
+      if (currentBlobURL) URL.revokeObjectURL(currentBlobURL);
+    });
+  </script>
+</body>
+        </html>
